@@ -1,146 +1,200 @@
-import dash
-from dash import dcc, html
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from collections import Counter
 import re
 
+# ── Load Data ──────────────────────────────────────────────────────────────────
 df = pd.read_csv("reviews.csv")
+df["at"] = pd.to_datetime(df["at"], errors="coerce")
+df["month"] = df["at"].dt.to_period("M").astype(str)
 
-total = len(df)
+# ── Stats ──────────────────────────────────────────────────────────────────────
+total    = len(df)
 positive = len(df[df["sentiment"] == "Positive"])
 negative = len(df[df["sentiment"] == "Negative"])
-neutral = len(df[df["sentiment"] == "Neutral"])
-pos_pct = round((positive / total) * 100) if total else 0
-neg_pct = round((negative / total) * 100) if total else 0
+neutral  = len(df[df["sentiment"] == "Neutral"])
+pos_pct  = round((positive / total) * 100) if total else 0
+neg_pct  = round((negative / total) * 100) if total else 0
+avg_score = round(df["score"].mean(), 1)
 
-all_text = " ".join(df["review"].astype(str).tolist()).lower()
+# ── Top Keywords ───────────────────────────────────────────────────────────────
+all_text = " ".join(df["content"].astype(str).tolist()).lower()
 words = re.findall(r'\b\w{3,}\b', all_text)
-stopwords = {"the","and","for","with","this","that","was","are","have","from","they","been","its","also","but","not","can","our","more","very","will","had"}
+stopwords = {"من","في","على","إلى","عن","مع","هذا","هذه","التي","الذي","وهو","كان","قال","لكن","أيضا","حتى","بعد","قبل","كل","يمكن","لان","لأن","انا","ماكو","اكو","بس","هو","هي","الي","مال","ولا","ما","مو","وين","شو","ليش"}
 word_freq = Counter(w for w in words if w not in stopwords)
 top_words = word_freq.most_common(8)
 wlabels, wvalues = zip(*top_words) if top_words else ([], [])
 
-if "date" in df.columns:
-    df["month"] = pd.to_datetime(df["date"], errors="coerce").dt.to_period("M").astype(str)
-    monthly = df.groupby("month").size().reset_index(name="count")
-else:
-    monthly = pd.DataFrame({"month": [], "count": []})
+# ── Monthly ────────────────────────────────────────────────────────────────────
+monthly = df.groupby("month").size().reset_index(name="count")
 
-BG = "#0f1117"
-SURFACE = "#1a1d27"
-BORDER = "#2a2d3a"
-ACCENT = "#f7a600"
-TEXT = "#e8eaf0"
-MUTED = "#8b8fa8"
-GREEN = "#22c55e"
-AMBER = "#f59e0b"
-RED = "#ef4444"
-PURPLE = "#a855f7"
+# ── Page Config ────────────────────────────────────────────────────────────────
+st.set_page_config(page_title="Agati Iraq Dashboard", page_icon="🚖", layout="wide")
 
-CHART = dict(paper_bgcolor=SURFACE, plot_bgcolor=SURFACE,
-             font=dict(color=TEXT, family="Segoe UI"), margin=dict(t=10,b=10,l=10,r=10))
+st.markdown("""
+<style>
+body, .stApp { background:#0f1117 !important; color:#e8eaf0; font-family: Segoe UI, Tahoma, Arial; }
+[data-testid="stMetricValue"] { font-size:2.2rem !important; font-weight:900 !important; }
+[data-testid="stMetricLabel"] { font-size:0.75rem !important; color:#8b8fa8 !important; text-transform:uppercase; letter-spacing:0.08em; }
+div[data-testid="metric-container"] {
+    background:#1a1d27; border:1px solid #2a2d3a;
+    border-radius:14px; padding:18px 20px;
+}
+.section-title {
+    display:flex; align-items:center; gap:10px;
+    font-size:11px; font-weight:700; color:#8b8fa8;
+    text-transform:uppercase; letter-spacing:0.1em;
+    margin-bottom:12px; margin-top:4px;
+}
+.section-title::before {
+    content:''; display:inline-block;
+    width:3px; height:16px; background:#f7a600; border-radius:2px;
+}
+.rec-card {
+    background:#1a1d27; border:1px solid #2a2d3a;
+    border-radius:12px; padding:16px 18px;
+    margin-bottom:10px;
+}
+.stDataFrame { background:#1a1d27 !important; }
+hr { border-color:#2a2d3a !important; }
+</style>
+""", unsafe_allow_html=True)
 
-fig_pie = px.pie(values=[positive,neutral,negative],
-                 names=["Positive","Neutral","Negative"],
-                 color_discrete_sequence=[GREEN,AMBER,RED], hole=0.55)
-fig_pie.update_traces(marker=dict(line=dict(color=BG, width=2)))
-fig_pie.update_layout(**CHART, legend=dict(font=dict(color=TEXT)))
+# ── Header ─────────────────────────────────────────────────────────────────────
+st.markdown("""
+<div style="display:flex;align-items:center;gap:14px;background:#1a1d27;
+            border:1px solid #2a2d3a;border-radius:14px;padding:18px 22px;margin-bottom:24px">
+  <div style="background:#f7a600;border-radius:10px;width:46px;height:46px;
+              display:flex;align-items:center;justify-content:center;font-size:22px">🚖</div>
+  <div>
+    <div style="font-size:20px;font-weight:800;color:#e8eaf0">Agati Iraq</div>
+    <div style="font-size:12px;color:#8b8fa8">Customer Reviews Dashboard</div>
+  </div>
+  <div style="margin-left:auto;background:#22c55e22;border:1px solid #22c55e55;
+              border-radius:20px;padding:4px 14px;font-size:12px;color:#22c55e;font-weight:600">
+    ● Live
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
-fig_words = go.Figure(go.Bar(x=list(wvalues), y=list(wlabels), orientation="h",
-                              marker=dict(color=ACCENT, line=dict(width=0))))
-fig_words.update_layout(**CHART,
-    xaxis=dict(showgrid=True, gridcolor=BORDER, color=MUTED),
-    yaxis=dict(showgrid=False, color=TEXT))
+# ── KPIs ───────────────────────────────────────────────────────────────────────
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.metric("📋 Total Reviews", total)
+c2.metric("😊 Positive",      positive)
+c3.metric("😐 Neutral",       neutral)
+c4.metric("😞 Negative",      negative)
+c5.metric("⭐ Avg Score",     avg_score)
 
-fig_monthly = go.Figure(go.Bar(x=monthly["month"], y=monthly["count"],
-                                marker=dict(color=ACCENT, opacity=0.85, line=dict(width=0))))
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ── Charts Row ─────────────────────────────────────────────────────────────────
+col1, col2 = st.columns(2)
+
+CHART = dict(paper_bgcolor="#1a1d27", plot_bgcolor="#1a1d27",
+             font=dict(color="#e8eaf0", family="Segoe UI"),
+             margin=dict(t=10, b=10, l=10, r=10))
+
+with col1:
+    st.markdown('<div class="section-title">Sentiment Distribution</div>', unsafe_allow_html=True)
+    fig_pie = go.Figure(go.Pie(
+        values=[positive, neutral, negative],
+        labels=["Positive", "Neutral", "Negative"],
+        hole=0.55,
+        marker=dict(colors=["#22c55e","#f59e0b","#ef4444"], line=dict(color="#0f1117", width=2)),
+    ))
+    fig_pie.update_layout(**CHART, legend=dict(font=dict(color="#e8eaf0")))
+    st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
+
+with col2:
+    st.markdown('<div class="section-title">Top Keywords</div>', unsafe_allow_html=True)
+    fig_words = go.Figure(go.Bar(
+        x=list(wvalues), y=list(wlabels), orientation="h",
+        marker=dict(color="#f7a600", line=dict(width=0)),
+    ))
+    fig_words.update_layout(**CHART,
+        xaxis=dict(showgrid=True, gridcolor="#2a2d3a", color="#8b8fa8"),
+        yaxis=dict(showgrid=False, color="#e8eaf0"))
+    st.plotly_chart(fig_words, use_container_width=True, config={"displayModeBar": False})
+
+# ── Monthly Trend ──────────────────────────────────────────────────────────────
+st.markdown('<div class="section-title">Monthly Review Trend</div>', unsafe_allow_html=True)
+fig_monthly = go.Figure(go.Bar(
+    x=monthly["month"], y=monthly["count"],
+    marker=dict(color="#f7a600", opacity=0.85, line=dict(width=0)),
+))
 fig_monthly.update_layout(**CHART,
-    xaxis=dict(showgrid=False, color=MUTED),
-    yaxis=dict(showgrid=True, gridcolor=BORDER, color=MUTED))
+    xaxis=dict(showgrid=False, color="#8b8fa8"),
+    yaxis=dict(showgrid=True, gridcolor="#2a2d3a", color="#8b8fa8"))
+st.plotly_chart(fig_monthly, use_container_width=True, config={"displayModeBar": False})
 
-def kpi(icon, value, label, color=TEXT):
-    return html.Div([
-        html.Div(icon, style={"fontSize":"24px","marginBottom":"8px"}),
-        html.Div(str(value), style={"fontSize":"34px","fontWeight":"900","color":color,"letterSpacing":"-1px"}),
-        html.Div(label, style={"fontSize":"11px","color":MUTED,"fontWeight":"600","textTransform":"uppercase","letterSpacing":"0.08em","marginTop":"4px"}),
-    ], style={"background":SURFACE,"border":f"1px solid {BORDER}","borderRadius":"14px","padding":"22px 20px","flex":"1","minWidth":"150px"})
+# ── Score Distribution ─────────────────────────────────────────────────────────
+st.markdown('<div class="section-title">Score Distribution (1-5 ⭐)</div>', unsafe_allow_html=True)
+score_counts = df["score"].value_counts().sort_index()
+fig_score = go.Figure(go.Bar(
+    x=[f"{'⭐'*i}" for i in score_counts.index],
+    y=score_counts.values,
+    marker=dict(color=["#ef4444","#f59e0b","#f59e0b","#22c55e","#22c55e"], line=dict(width=0)),
+))
+fig_score.update_layout(**CHART,
+    xaxis=dict(showgrid=False, color="#e8eaf0"),
+    yaxis=dict(showgrid=True, gridcolor="#2a2d3a", color="#8b8fa8"))
+st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar": False})
 
-def rec(icon, title, text, color):
-    return html.Div([
-        html.Div(icon, style={"fontSize":"20px","marginBottom":"8px"}),
-        html.Div(title, style={"fontSize":"13px","fontWeight":"700","color":TEXT,"marginBottom":"4px"}),
-        html.Div(text, style={"fontSize":"12px","color":MUTED,"lineHeight":"1.6"}),
-    ], style={"background":BG,"border":f"1px solid {BORDER}","borderRight":f"3px solid {color}",
-              "borderRadius":"12px","padding":"16px 18px","flex":"1","minWidth":"200px"})
+# ── Recommendations ────────────────────────────────────────────────────────────
+st.markdown('<div class="section-title">Smart Recommendations</div>', unsafe_allow_html=True)
+r1, r2, r3, r4 = st.columns(4)
 
-def title(text):
-    return html.Div([
-        html.Div(style={"width":"3px","height":"18px","background":ACCENT,"borderRadius":"2px"}),
-        html.Span(text, style={"fontSize":"12px","fontWeight":"700","color":MUTED,"textTransform":"uppercase","letterSpacing":"0.1em"}),
-    ], style={"display":"flex","alignItems":"center","gap":"10px","marginBottom":"16px"})
+with r1:
+    st.markdown(f"""<div class="rec-card" style="border-right:3px solid #ef4444">
+        <div style="font-size:20px;margin-bottom:8px">🚨</div>
+        <div style="font-size:13px;font-weight:700;color:#e8eaf0;margin-bottom:4px">Reduce Negatives</div>
+        <div style="font-size:12px;color:#8b8fa8;line-height:1.6">{neg_pct}% negative reviews — focus on response time and driver tracking.</div>
+    </div>""", unsafe_allow_html=True)
 
-app = dash.Dash(__name__, title="Agati Iraq Dashboard")
+with r2:
+    st.markdown(f"""<div class="rec-card" style="border-right:3px solid #22c55e">
+        <div style="font-size:20px;margin-bottom:8px">✅</div>
+        <div style="font-size:13px;font-weight:700;color:#e8eaf0;margin-bottom:4px">Keep Strengths</div>
+        <div style="font-size:12px;color:#8b8fa8;line-height:1.6">{pos_pct}% positive — customers love the service. Maintain driver quality.</div>
+    </div>""", unsafe_allow_html=True)
 
-app.layout = html.Div(style={"background":BG,"minHeight":"100vh","fontFamily":"Segoe UI, Tahoma, Arial"}, children=[
+with r3:
+    st.markdown(f"""<div class="rec-card" style="border-right:3px solid #f59e0b">
+        <div style="font-size:20px;margin-bottom:8px">📊</div>
+        <div style="font-size:13px;font-weight:700;color:#e8eaf0;margin-bottom:4px">Convert Neutrals</div>
+        <div style="font-size:12px;color:#8b8fa8;line-height:1.6">{neutral} neutral reviews — offer discounts or loyalty points to convert them.</div>
+    </div>""", unsafe_allow_html=True)
 
-    html.Div([
-        html.Div("🚖", style={"fontSize":"22px","background":ACCENT,"borderRadius":"10px",
-                               "width":"44px","height":"44px","display":"flex","alignItems":"center","justifyContent":"center"}),
-        html.Div([
-            html.Div("Agati Iraq", style={"fontSize":"20px","fontWeight":"800","color":TEXT}),
-            html.Div("Customer Reviews Dashboard", style={"fontSize":"12px","color":MUTED}),
-        ]),
-        html.Div("● Live", style={"marginLeft":"auto","background":"#22c55e22","border":"1px solid #22c55e55",
-                                   "borderRadius":"20px","padding":"4px 14px","fontSize":"12px","color":GREEN,"fontWeight":"600"}),
-    ], style={"background":SURFACE,"borderBottom":f"1px solid {BORDER}","padding":"18px 32px",
-              "display":"flex","alignItems":"center","gap":"14px"}),
+with r4:
+    st.markdown(f"""<div class="rec-card" style="border-right:3px solid #a855f7">
+        <div style="font-size:20px;margin-bottom:8px">📱</div>
+        <div style="font-size:13px;font-weight:700;color:#e8eaf0;margin-bottom:4px">App Experience</div>
+        <div style="font-size:12px;color:#8b8fa8;line-height:1.6">Avg score {avg_score}/5 — review payment and navigation issues in the app.</div>
+    </div>""", unsafe_allow_html=True)
 
-    html.Div(style={"maxWidth":"1200px","margin":"0 auto","padding":"28px 24px"}, children=[
+# ── Reviews Table ──────────────────────────────────────────────────────────────
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown('<div class="section-title">All Reviews</div>', unsafe_allow_html=True)
 
-        html.Div([
-            kpi("📋", total,        "Total Reviews"),
-            kpi("😊", positive,     "Positive",    GREEN),
-            kpi("😐", neutral,      "Neutral",     AMBER),
-            kpi("😞", negative,     "Negative",    RED),
-            kpi("📈", f"{pos_pct}%","Satisfaction",ACCENT),
-        ], style={"display":"flex","gap":"16px","flexWrap":"wrap","marginBottom":"24px"}),
+filter_col, search_col = st.columns([1, 3])
+with filter_col:
+    sentiment_filter = st.selectbox("Filter by Sentiment", ["All", "Positive", "Neutral", "Negative"], label_visibility="collapsed")
+with search_col:
+    search_text = st.text_input("Search", placeholder="🔍 Search reviews...", label_visibility="collapsed")
 
-        html.Div([
-            html.Div([title("Sentiment Distribution"),
-                      dcc.Graph(figure=fig_pie, config={"displayModeBar":False}, style={"height":"260px"})],
-                     style={"background":SURFACE,"border":f"1px solid {BORDER}","borderRadius":"14px","padding":"24px","flex":"1"}),
-            html.Div([title("Top Keywords"),
-                      dcc.Graph(figure=fig_words, config={"displayModeBar":False}, style={"height":"260px"})],
-                     style={"background":SURFACE,"border":f"1px solid {BORDER}","borderRadius":"14px","padding":"24px","flex":"1"}),
-        ], style={"display":"flex","gap":"20px","marginBottom":"20px","flexWrap":"wrap"}),
+filtered = df.copy()
+if sentiment_filter != "All":
+    filtered = filtered[filtered["sentiment"] == sentiment_filter]
+if search_text:
+    filtered = filtered[filtered["content"].str.contains(search_text, na=False)]
 
-        html.Div([title("Monthly Trend"),
-                  dcc.Graph(figure=fig_monthly, config={"displayModeBar":False}, style={"height":"180px"})],
-                 style={"background":SURFACE,"border":f"1px solid {BORDER}","borderRadius":"14px","padding":"24px","marginBottom":"20px"}),
-
-        html.Div([title("Smart Recommendations"),
-            html.Div([
-                rec("🚨","Reduce Wait Time",      f"{neg_pct}% negative reviews — improve driver response and live tracking.", RED),
-                rec("✅","Driver Quality",         "Positive reviews highlight polite drivers and clean cars. Keep it up.",     GREEN),
-                rec("📊","Convert Neutral Users", f"{neutral} neutral reviews — offer discounts to build loyalty.",            AMBER),
-                rec("📱","App Experience",         "Check payment and navigation issues — tech bugs hurt satisfaction.",        PURPLE),
-            ], style={"display":"flex","gap":"14px","flexWrap":"wrap"}),
-        ], style={"background":SURFACE,"border":f"1px solid {BORDER}","borderRadius":"14px","padding":"24px","marginBottom":"20px"}),
-
-        html.Div([title("All Reviews"),
-            html.Div(df[["review","sentiment"]].to_html(index=False, classes="tbl", border=0), dangerously_allow_html=True),
-        ], style={"background":SURFACE,"border":f"1px solid {BORDER}","borderRadius":"14px","padding":"24px"}),
-    ]),
-
-    html.Style(f"""
-        .tbl{{width:100%;border-collapse:collapse;font-size:13px;color:{TEXT};font-family:Segoe UI}}
-        .tbl th{{padding:10px 12px;color:{MUTED};font-weight:600;border-bottom:1px solid {BORDER};text-align:left}}
-        .tbl td{{padding:10px 12px;border-bottom:1px solid #2a2d3a33}}
-        .tbl tr:hover td{{background:#ffffff06}}
-    """),
-])
-
-if __name__ == "__main__":
-    app.run(debug=True)
+st.dataframe(
+    filtered[["content", "score", "at", "sentiment"]].rename(columns={
+        "content": "Review", "score": "Score", "at": "Date", "sentiment": "Sentiment"
+    }),
+    use_container_width=True,
+    hide_index=True,
+)
+st.caption(f"Showing {len(filtered)} of {total} reviews")
